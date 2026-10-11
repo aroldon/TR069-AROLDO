@@ -11,6 +11,10 @@ type Settings = {
   online_threshold_s: number;
   diagnostic_cooldown_s: number;
   diagnostic_timeout_s: number;
+  optical_rx_no_signal_dbm: number;
+  optical_rx_critical_dbm: number;
+  optical_rx_warning_dbm: number;
+  optical_rx_overload_dbm: number;
 };
 
 export default function AdminGeneralPage() {
@@ -118,6 +122,56 @@ export default function AdminGeneralPage() {
               />
             </div>
           </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <FieldLabel>RX sem sinal (dBm)</FieldLabel>
+              <Control
+                type="number"
+                step="0.1"
+                value={form.optical_rx_no_signal_dbm}
+                onChange={(e) =>
+                  setForm({ ...form, optical_rx_no_signal_dbm: e.target.valueAsNumber })
+                }
+              />
+            </div>
+            <div>
+              <FieldLabel>RX crítico (dBm)</FieldLabel>
+              <Control
+                type="number"
+                step="0.1"
+                value={form.optical_rx_critical_dbm}
+                onChange={(e) =>
+                  setForm({ ...form, optical_rx_critical_dbm: e.target.valueAsNumber })
+                }
+              />
+            </div>
+            <div>
+              <FieldLabel>RX em atenção (dBm)</FieldLabel>
+              <Control
+                type="number"
+                step="0.1"
+                value={form.optical_rx_warning_dbm}
+                onChange={(e) =>
+                  setForm({ ...form, optical_rx_warning_dbm: e.target.valueAsNumber })
+                }
+              />
+            </div>
+            <div>
+              <FieldLabel>RX sobrecarga (dBm)</FieldLabel>
+              <Control
+                type="number"
+                step="0.1"
+                value={form.optical_rx_overload_dbm}
+                onChange={(e) =>
+                  setForm({ ...form, optical_rx_overload_dbm: e.target.valueAsNumber })
+                }
+              />
+            </div>
+          </div>
+          <p className="text-[12px] text-quiet">
+            Faixas do sinal recebido: sem sinal ≤ crítico ≤ atenção, e sobrecarga acima do teto.
+            Padrão −30 / −27 / −24 / −8 dBm.
+          </p>
           <div className="flex justify-end pt-1">
             <Btn type="submit" disabled={saving}>
               Salvar

@@ -31,6 +31,10 @@ No GenieACS/ACL de rede, libere **somente** o IP da VPS Mr9. Técnicos no browse
 | ZTE H3601P P1/P3 | `LANDevice.1.WIFI.Radio.*` (case) | `zte` / fallback H3601 |
 | Huawei EG8145 / K562e | `…WiFi.NeighboringWiFiDiagnostic` | `huawei.eg8145` |
 | Intelbras GF1200 / W4 | `WiFi.X_ITBS_StartNeighboringWiFiDiagnostic` + `…Result` | `intelbras.gf1200` |
+| ZTE | `X_CT-COM_EponInterfaceConfig`, `X_CT-COM_GponInterfaceConfig`, `WANDevice.1.X_ZTE-COM_WANPONInterfaceConfig` | `zte` |
+| Huawei | `X_GponInterafceConfig`, `X_GponInterfaceConfig`, depois `X_HW_DEBUG.AdminTR069` | `huawei` |
+
+`optical_refresh` atualiza só o container óptico já presente no CPE. `wifi_clients_get` lê `AssociatedDevice` e não substitui `hosts_get`. `params_get` aceita apenas `optical.container`, `diag.ping` e `diag.traceroute` — path livre é recusado. Limiares de RX ficam em `AppSettings` (padrão −30 / −27 / −24 / −8 dBm).
 
 Guia completo para contribuir paths: [vendor-paths.md](vendor-paths.md).
 

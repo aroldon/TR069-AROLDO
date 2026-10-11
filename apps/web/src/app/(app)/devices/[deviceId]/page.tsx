@@ -42,9 +42,12 @@ import { OpticalTelemetryPanel } from "@/components/ops/OpticalTelemetryPanel";
 import { NetworkToolsPanel } from "@/components/ops/NetworkToolsPanel";
 import { RouterPortDisplay } from "@/components/ops/RouterPortDisplay";
 import {
+  associatedClientsMessage,
   formatBytes,
   hasInventoryValue,
   inventoryValue,
+  opticalHealthLabel,
+  opticalInventoryMessage,
   wifiBand,
   workbenchNeedsRefresh,
   type DiagnosticHistoryItem,
@@ -98,6 +101,11 @@ export default function DeviceDetailPage() {
     channel: "",
     bandwidth: "",
     enabled: true,
+    hidden: false,
+    maxClients: "",
+    authMode: "",
+    encryption: "",
+    txPower: "",
   });
   const [lanEdit, setLanEdit] = useState(false);
   const [lanDialogPosition, setLanDialogPosition] = useState<FloatingDialogPosition>({
@@ -231,8 +239,19 @@ export default function DeviceDetailPage() {
       channel: radio.autoChannel ? "0" : radio.channel || "",
       bandwidth: radio.bandwidth || "",
       enabled: radio.enabled !== false,
+      hidden: radio.hidden === true,
+      maxClients: radio.maxClients != null ? String(radio.maxClients) : "",
+      authMode: ["None", "Basic", "WPA", "11i", "WPAand11i"].includes(radio.authMode || "")
+        ? radio.authMode || ""
+        : "",
+      encryption: ["AESEncryption", "TKIPEncryption", "TKIPandAESEncryption"].includes(
+        radio.encryption || "",
+      )
+        ? radio.encryption || ""
+        : "",
+      txPower: radio.txPower != null ? String(radio.txPower) : "",
     });
-    setWifiDialogPosition(positionFloatingDialog(anchor, 680, 680));
+    setWifiDialogPosition(positionFloatingDialog(anchor, 680, 900));
     setWifiEdit(radio);
   }
 
@@ -490,7 +509,11 @@ export default function DeviceDetailPage() {
                     title={wb.optical.technology || "Óptica"}
                     body={
                       wb.optical.rxPowerDbm != null
-                        ? `${wb.optical.rxPowerDbm.toLocaleString("pt-BR")} dBm`
+                        ? `${wb.optical.rxPowerDbm.toLocaleString("pt-BR")} dBm${
+                            opticalHealthLabel(wb.optical.health)
+                              ? ` · ${opticalHealthLabel(wb.optical.health)}`
+                              : ""
+                          }`
                         : wb.optical.status || "Detectada"
                     }
                     tone="signal"
@@ -629,7 +652,20 @@ export default function DeviceDetailPage() {
                   />
                 </div>
               </Panel>
-              {wb?.optical ? <OpticalTelemetryPanel optical={wb.optical} /> : null}
+              {wb?.optical ? (
+                <OpticalTelemetryPanel
+                  optical={wb.optical}
+                  refreshing={busy}
+                  onRefresh={() => runAction("optical_refresh")}
+                />
+              ) : (
+                <Panel>
+                  <PanelTitle
+                    title="Enlace óptico"
+                    hint={opticalInventoryMessage(online, false) ?? undefined}
+                  />
+                </Panel>
+              )}
               <LiveTrafficChart deviceId={deviceId} online={online} />
             </>
           ) : null}
@@ -689,22 +725,68 @@ export default function DeviceDetailPage() {
           ) : null}
 
           {section === "wifi" ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {(wb?.wifi || []).map((radio, index) => (
-                <WifiCard
-                  key={radio.root}
-                  label={`AP ${radio.index ?? index + 1} · ${wifiBand(radio) === "24" ? "2.4 GHz" : "5 GHz"}`}
-                  radio={radio}
-                  onEdit={(anchor) => openWifi(radio, anchor)}
+            <div className="grid gap-3">
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {(wb?.wifi || []).map((radio, index) => (
+                  <WifiCard
+                    key={radio.root}
+                    label={`AP ${radio.index ?? index + 1} · ${wifiBand(radio) === "24" ? "2.4 GHz" : "5 GHz"}`}
+                    radio={radio}
+                    onEdit={(anchor) => openWifi(radio, anchor)}
+                  />
+                ))}
+                {!wb?.wifi?.length ? (
+                  <Panel className="md:col-span-2 xl:col-span-3">
+                    <p className="text-[13px] text-quiet">
+                      Nenhum access point Wi-Fi foi reportado por este CPE.
+                    </p>
+                  </Panel>
+                ) : null}
+              </div>
+              <Panel>
+                <PanelTitle
+                  title="Clientes no rádio"
+                  hint="Estações em AssociatedDevice. Os hosts da LAN continuam na seção Hosts."
                 />
-              ))}
-              {!wb?.wifi?.length ? (
-                <Panel className="md:col-span-2 xl:col-span-3">
+                {(wb?.wifiClients || []).length ? (
+                  <div className="overflow-x-auto">
+                    <table className="ops-table">
+                      <thead>
+                        <tr>
+                          <th>SSID</th>
+                          <th>MAC</th>
+                          <th>Sinal</th>
+                          <th>Autenticado</th>
+                          <th>Índice</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(wb?.wifiClients || []).map((client) => (
+                          <tr key={`${client.radioIndex ?? "r"}-${client.index}-${client.mac}`}>
+                            <td>{client.ssid || "—"}</td>
+                            <td className="tech">{client.mac || "—"}</td>
+                            <td className="tech">
+                              {client.signalDbm != null ? `${client.signalDbm} dBm` : "—"}
+                            </td>
+                            <td>
+                              {client.authenticated == null
+                                ? "—"
+                                : client.authenticated
+                                  ? "Sim"
+                                  : "Não"}
+                            </td>
+                            <td className="tech">{client.index}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
                   <p className="text-[13px] text-quiet">
-                    Nenhum access point Wi-Fi foi reportado por este CPE.
+                    {associatedClientsMessage(online, 0)}
                   </p>
-                </Panel>
-              ) : null}
+                )}
+              </Panel>
             </div>
           ) : null}
 
@@ -1392,6 +1474,95 @@ export default function DeviceDetailPage() {
                     </SelectControl>
                   </div>
                 </div>
+                {wifiEdit.supports?.hidden ? (
+                  <label className="flex items-center justify-between rounded-[6px] border border-rule bg-panel-2 px-3 py-2.5 text-[13px] font-semibold">
+                    <span>
+                      <span className="block">SSID oculto</span>
+                      <span className="text-[12px] font-normal text-quiet">
+                        Deixa de anunciar o nome da rede.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={wifiDraft.hidden}
+                      onChange={(event) =>
+                        setWifiDraft({ ...wifiDraft, hidden: event.target.checked })
+                      }
+                      className="h-4 w-4 accent-accent"
+                    />
+                  </label>
+                ) : null}
+                {wifiEdit.supports?.maxClients ||
+                wifiEdit.supports?.auth ||
+                wifiEdit.supports?.encryption ||
+                wifiEdit.supports?.txPower ? (
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {wifiEdit.supports?.maxClients ? (
+                      <div>
+                        <FieldLabel>Máximo de clientes</FieldLabel>
+                        <Control
+                          type="number"
+                          min={1}
+                          max={128}
+                          value={wifiDraft.maxClients}
+                          onChange={(event) =>
+                            setWifiDraft({ ...wifiDraft, maxClients: event.target.value })
+                          }
+                          placeholder="Manter atual"
+                        />
+                      </div>
+                    ) : null}
+                    {wifiEdit.supports?.txPower ? (
+                      <div>
+                        <FieldLabel>Potência (%)</FieldLabel>
+                        <Control
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={wifiDraft.txPower}
+                          onChange={(event) =>
+                            setWifiDraft({ ...wifiDraft, txPower: event.target.value })
+                          }
+                          placeholder="Manter atual"
+                        />
+                      </div>
+                    ) : null}
+                    {wifiEdit.supports?.auth ? (
+                      <div>
+                        <FieldLabel>Autenticação</FieldLabel>
+                        <SelectControl
+                          value={wifiDraft.authMode}
+                          onChange={(event) =>
+                            setWifiDraft({ ...wifiDraft, authMode: event.target.value })
+                          }
+                        >
+                          <option value="">Manter atual</option>
+                          <option value="None">Aberta</option>
+                          <option value="Basic">Básica</option>
+                          <option value="WPA">WPA</option>
+                          <option value="11i">WPA2</option>
+                          <option value="WPAand11i">WPA/WPA2</option>
+                        </SelectControl>
+                      </div>
+                    ) : null}
+                    {wifiEdit.supports?.encryption ? (
+                      <div>
+                        <FieldLabel>Criptografia</FieldLabel>
+                        <SelectControl
+                          value={wifiDraft.encryption}
+                          onChange={(event) =>
+                            setWifiDraft({ ...wifiDraft, encryption: event.target.value })
+                          }
+                        >
+                          <option value="">Manter atual</option>
+                          <option value="AESEncryption">AES</option>
+                          <option value="TKIPEncryption">TKIP</option>
+                          <option value="TKIPandAESEncryption">TKIP+AES</option>
+                        </SelectControl>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
                 <label className="flex items-center justify-between rounded-[6px] border border-rule bg-panel-2 px-3 py-2.5 text-[13px] font-semibold">
                   <span>
                     <span className="block">Access point habilitado</span>
@@ -1420,7 +1591,28 @@ export default function DeviceDetailPage() {
               <Btn
                 disabled={busy || !wifiDraft.root}
                 onClick={async () => {
-                  await runAction("wifi_set", wifiDraft);
+                  const params: Record<string, unknown> = {
+                    root: wifiDraft.root,
+                    ssid: wifiDraft.ssid,
+                    password: wifiDraft.password,
+                    channel: wifiDraft.channel,
+                    bandwidth: wifiDraft.bandwidth,
+                    enabled: wifiDraft.enabled,
+                  };
+                  if (wifiEdit.supports?.hidden) params.hidden = wifiDraft.hidden;
+                  if (wifiEdit.supports?.maxClients && wifiDraft.maxClients !== "") {
+                    params.maxClients = Number(wifiDraft.maxClients);
+                  }
+                  if (wifiEdit.supports?.auth && wifiDraft.authMode) {
+                    params.authMode = wifiDraft.authMode;
+                  }
+                  if (wifiEdit.supports?.encryption && wifiDraft.encryption) {
+                    params.encryption = wifiDraft.encryption;
+                  }
+                  if (wifiEdit.supports?.txPower && wifiDraft.txPower !== "") {
+                    params.txPower = Number(wifiDraft.txPower);
+                  }
+                  await runAction("wifi_set", params);
                   setWifiEdit(null);
                 }}
               >

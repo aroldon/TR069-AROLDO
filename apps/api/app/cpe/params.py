@@ -28,6 +28,12 @@ class Cap:
     WIFI_AUTO_CHANNEL = "wifi.auto_channel"
     WIFI_BANDWIDTH = "wifi.bandwidth"
     WIFI_ENABLE = "wifi.enable"
+    WIFI_HIDDEN = "wifi.hidden"
+    WIFI_MAX_CLIENTS = "wifi.max_clients"
+    WIFI_AUTH = "wifi.auth"
+    WIFI_ENCRYPTION = "wifi.encryption"
+    WIFI_TX_POWER = "wifi.tx_power"
+    WIFI_ASSOCIATED = "wifi.associated"
 
     WAN_DEVICE = "wan.device"  # container WANDevice
     WAN_VLAN = "wan.vlan"

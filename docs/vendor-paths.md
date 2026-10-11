@@ -51,13 +51,27 @@ Compatibilidade inicial:
 
 | Perfil | Containers |
 |---|---|
-| Huawei | `X_GponInterafceConfig` (typo presente em firmware) e `X_GponInterfaceConfig` |
+| ZTE | `X_CT-COM_EponInterfaceConfig`, `X_CT-COM_GponInterfaceConfig` (folhas em `Stats`) e `WANDevice.1.X_ZTE-COM_WANPONInterfaceConfig` |
+| Huawei | `X_GponInterafceConfig` (typo presente em firmware), `X_GponInterfaceConfig` e, depois, `X_HW_DEBUG.AdminTR069` |
 | Genérico | `Device.Optical.Interface.{i}` e `InternetGatewayDevice.WANDevice.1.OpticalInterface.{i}` |
+
+Não há perfil Realtek. `X_Gpon*` continua na frente de `X_HW_DEBUG`: o path que
+já lia o EG8145 não é substituído. A action `optical_refresh` faz `refreshObject`
+só no primeiro container que já existe no inventário daquele CPE.
 
 Um stub GenieACS sem `_value` não detecta uma ONU nem vira texto na tela. O
 extrator também não tenta corrigir escalas proprietárias por heurística: se um
 vendor transmite potência, tensão ou distância em unidade codificada, a
-conversão deve entrar no perfil desse vendor acompanhada de fixture real.
+conversão deve entrar no perfil desse vendor acompanhada de fixture real. Sem
+essa fixture, RX, TX e tensão aparecem crus — inclusive um `SupplyVoltage` em
+milivolts.
+
+A saúde do RX (`good`, `warning`, `critical`, `no_signal`, `overload`) usa os
+quatro limiares de `AppSettings`. O padrão é −30 / −27 / −24 / −8 dBm.
+
+Clientes de rádio saem de `WLANConfiguration.{i}.AssociatedDevice` (`wifi_clients_get`)
+e não substituem `Hosts.Host`. `wifi_set` só grava SSID oculto, máximo de clientes,
+`BeaconType`, criptografia e `TransmitPower` quando a folha já existe no aparelho.
 
 FEC, HEC e CRC são contadores acumulados. Um total isolado é inventário; somente
 o delta positivo entre amostras pode representar erro atual e afetar diagnóstico.

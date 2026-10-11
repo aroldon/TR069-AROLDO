@@ -1,7 +1,9 @@
+from app.acs.summary import DEVICE_DETAIL_PROJECTION
 from app.cpe.params import Cap, DeviceIdentity, matching_profiles, resolve_candidates
 from app.cpe.profiles import (
     ALL_PROFILES,
     candidates_for,
+    discovery_candidates,
     identity_from_device,
     manufacturer_distribution_groups,
 )
@@ -57,3 +59,27 @@ def test_fiberhome_profile_and_manufacturer_groups():
     assert matched_ids[0] == "fiberhome"
     groups = {group["id"] for group in manufacturer_distribution_groups()}
     assert {"zte", "huawei", "intelbras", "fiberhome"} <= groups
+
+
+def test_optical_catalog_adds_zte_and_huawei_debug_without_realtek():
+    zte = resolve_candidates(DeviceIdentity("ZTE", "H3601P"), Cap.OPTICAL_CONTAINER, ALL_PROFILES)
+    assert zte[0] == "InternetGatewayDevice.X_CT-COM_EponInterfaceConfig"
+    assert zte[1] == "InternetGatewayDevice.X_CT-COM_GponInterfaceConfig"
+    assert zte[2] == "InternetGatewayDevice.WANDevice.1.X_ZTE-COM_WANPONInterfaceConfig"
+    assert zte.index("Device.Optical.Interface") > 2
+
+    huawei = resolve_candidates(
+        DeviceIdentity("Huawei Technologies Co., Ltd.", "EG8145V5"),
+        Cap.OPTICAL_CONTAINER,
+        ALL_PROFILES,
+    )
+    typo = "InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig"
+    gpon = "InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig"
+    debug = "InternetGatewayDevice.X_HW_DEBUG.AdminTR069"
+    assert huawei.index(typo) < huawei.index(gpon) < huawei.index(debug)
+
+    discovered = discovery_candidates(Cap.OPTICAL_CONTAINER)
+    assert debug in DEVICE_DETAIL_PROJECTION
+    assert "InternetGatewayDevice.X_CT-COM_EponInterfaceConfig" in DEVICE_DETAIL_PROJECTION
+    assert all("Realtek" not in path and "realtek" not in profile.id for profile in ALL_PROFILES for path in (profile.id,))
+    assert all("Realtek" not in path and "X_Realtek" not in path for path in discovered)

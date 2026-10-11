@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON, Uuid
 
@@ -21,6 +21,19 @@ class AppSettings(Base):
     online_threshold_s: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
     diagnostic_cooldown_s: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
     diagnostic_timeout_s: Mapped[int] = mapped_column(Integer, nullable=False, default=120)
+    # Faixas de RX óptico (dBm). Default do produto; cada instalação ajusta em AppSettings.
+    optical_rx_no_signal_dbm: Mapped[float] = mapped_column(
+        Float, nullable=False, default=-30.0, server_default="-30"
+    )
+    optical_rx_critical_dbm: Mapped[float] = mapped_column(
+        Float, nullable=False, default=-27.0, server_default="-27"
+    )
+    optical_rx_warning_dbm: Mapped[float] = mapped_column(
+        Float, nullable=False, default=-24.0, server_default="-24"
+    )
+    optical_rx_overload_dbm: Mapped[float] = mapped_column(
+        Float, nullable=False, default=-8.0, server_default="-8"
+    )
     notes: Mapped[str] = mapped_column(Text, nullable=False, default="")
     # Fingerprint da MR9_SECRET_KEY usada ao cifrar bearers NBI (detecção de rotação).
     crypto_key_fp: Mapped[str | None] = mapped_column(String(16), nullable=True, default=None)

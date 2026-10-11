@@ -12,7 +12,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.acs.actions import ActionContext, dispatch, ensure_handlers_loaded, get_action, list_actions
-from app.acs.summary import DEVICE_DETAIL_PROJECTION, build_workbench, device_summary
+from app.acs.summary import (
+    DEVICE_DETAIL_PROJECTION,
+    build_workbench,
+    device_summary,
+    optical_thresholds_from_settings,
+)
 from app.core.database import get_db
 from app.core.deps import AuthContext, get_current_auth, optional_acs_server_id
 from app.cpe.extract import extract_wan_profiles
@@ -212,5 +217,7 @@ async def get_device(
         "acs_server_id": str(server.id),
         "summary": device_summary(dev, online_threshold_s=server.online_threshold_s or threshold),
         "device": dev,
-        "workbench": build_workbench(dev),
+        "workbench": build_workbench(
+            dev, optical_thresholds=optical_thresholds_from_settings(settings)
+        ),
     }

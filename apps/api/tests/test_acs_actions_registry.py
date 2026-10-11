@@ -23,8 +23,20 @@ def test_actions_registry_loads_core_handlers():
         "traceroute",
         "diagnostic_full",
         "diagnostic_clear",
+        "optical_refresh",
+        "wifi_clients_get",
+        "params_get",
     }
     assert expected <= names
+    optical = get_action("optical_refresh")
+    assert optical is not None
+    assert optical.permission == "acs.devices.write"
+    clients = get_action("wifi_clients_get")
+    assert clients is not None
+    assert clients.permission is None
+    params = get_action("params_get")
+    assert params is not None
+    assert params.permission == "acs.devices.write"
     reboot = get_action("reboot")
     assert reboot is not None
     assert reboot.permission == "acs.devices.write"

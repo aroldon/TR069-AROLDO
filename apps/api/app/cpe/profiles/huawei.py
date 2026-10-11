@@ -16,6 +16,7 @@ HUAWEI = VendorProfile(
             candidates=(
                 "InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig",
                 "InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig",
+                "InternetGatewayDevice.X_HW_DEBUG.AdminTR069",
                 "Device.Optical.Interface",
             ),
             leaf_map={
@@ -31,7 +32,10 @@ HUAWEI = VendorProfile(
                 "hec": ("Stats.HECError", "Stats.HECErrors"),
                 "crc": ("Stats.CRCError", "Stats.CRCErrors"),
             },
-            notes="Huawei usa também o typo de firmware X_GponInterafceConfig.",
+            notes=(
+                "X_Gpon* continua primeiro. X_HW_DEBUG.AdminTR069 entra depois, "
+                "sem substituir o path que já lê. Sem conversão de escala."
+            ),
         ),
         Cap.WIFI_BANDWIDTH: PathFamily(
             capability=Cap.WIFI_BANDWIDTH,

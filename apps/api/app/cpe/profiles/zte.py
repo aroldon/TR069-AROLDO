@@ -12,6 +12,25 @@ ZTE = VendorProfile(
     priority=100,
     notes="Paths ZTE comuns (VLAN / vizinhos sob LANDevice.*.WiFi|WIFI.Radio).",
     families={
+        Cap.OPTICAL_CONTAINER: PathFamily(
+            capability=Cap.OPTICAL_CONTAINER,
+            candidates=(
+                "InternetGatewayDevice.X_CT-COM_EponInterfaceConfig",
+                "InternetGatewayDevice.X_CT-COM_GponInterfaceConfig",
+                "InternetGatewayDevice.WANDevice.1.X_ZTE-COM_WANPONInterfaceConfig",
+            ),
+            leaf_map={
+                "rx_power": ("Stats.RxPower", "Stats.RXPower", "RXPower", "RxPower"),
+                "tx_power": ("Stats.TxPower", "Stats.TXPower", "TXPower", "TxPower"),
+                "temperature": ("Stats.Temperature", "TransceiverTemperature", "Temperature"),
+                "voltage": ("Stats.Voltage", "SupplyVoltage", "Voltage"),
+                "bias": ("Stats.BiasCurrent", "BiasCurrent"),
+            },
+            notes=(
+                "CT-COM guarda potência em Stats. WAN PON usa RXPower/TXPower na raiz. "
+                "Sem conversão de escala: não há fixture local de mV ou 0,1 dBm."
+            ),
+        ),
         Cap.WIFI_BANDWIDTH: PathFamily(
             capability=Cap.WIFI_BANDWIDTH,
             candidates=("{root}.X_ZTE-COM_BandWidth", "{root}.Bandwidth"),

@@ -6,6 +6,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.cpe.extract import (
+    OpticalThresholds,
+    classify_optical_rx,
     extract_dhcp_lan,
     extract_hosts,
     extract_lan_ports,
@@ -13,6 +15,7 @@ from app.cpe.extract import (
     extract_optical_telemetry,
     extract_port_mappings,
     extract_wan_profiles,
+    extract_wifi_clients,
     extract_wifi_radios,
 )
 from app.cpe.params import Cap, identity_from_device
@@ -98,7 +101,34 @@ def device_summary(dev: dict[str, Any], *, online_threshold_s: int) -> dict[str,
     }
 
 
-def build_workbench(dev: dict[str, Any]) -> dict[str, Any]:
+def optical_thresholds_from_settings(settings: Any) -> OpticalThresholds:
+    base = OpticalThresholds()
+    if settings is None:
+        return base
+
+    def pick(name: str, fallback: float) -> float:
+        value = getattr(settings, name, None)
+        return fallback if value is None else float(value)
+
+    return OpticalThresholds(
+        no_signal_dbm=pick("optical_rx_no_signal_dbm", base.no_signal_dbm),
+        critical_dbm=pick("optical_rx_critical_dbm", base.critical_dbm),
+        warning_dbm=pick("optical_rx_warning_dbm", base.warning_dbm),
+        overload_dbm=pick("optical_rx_overload_dbm", base.overload_dbm),
+    )
+
+
+def build_workbench(
+    dev: dict[str, Any],
+    *,
+    optical_thresholds: OpticalThresholds | None = None,
+) -> dict[str, Any]:
+    optical = extract_optical_telemetry(dev)
+    if optical is not None:
+        optical = {
+            **optical,
+            "health": classify_optical_rx(optical.get("rxPowerDbm"), optical_thresholds),
+        }
     return {
         "wifi": extract_wifi_radios(dev),
         "wan": extract_wan_profiles(dev),
@@ -107,5 +137,6 @@ def build_workbench(dev: dict[str, Any]) -> dict[str, Any]:
         "lanPorts": extract_lan_ports(dev),
         "portmap": extract_port_mappings(dev),
         "neighbors": extract_neighbor_networks(dev),
-        "optical": extract_optical_telemetry(dev),
+        "optical": optical,
+        "wifiClients": extract_wifi_clients(dev),
     }

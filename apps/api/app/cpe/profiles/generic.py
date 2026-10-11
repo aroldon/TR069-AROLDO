@@ -53,6 +53,47 @@ GENERIC = VendorProfile(
             candidates=("{root}.Enable",),
             leaf_map={"enable": ("Enable",)},
         ),
+        Cap.WIFI_HIDDEN: PathFamily(
+            capability=Cap.WIFI_HIDDEN,
+            candidates=("{root}.SSIDAdvertisementEnabled",),
+            leaf_map={"hidden": ("SSIDAdvertisementEnabled",)},
+            notes="SSIDAdvertisementEnabled falso significa SSID oculto.",
+        ),
+        Cap.WIFI_MAX_CLIENTS: PathFamily(
+            capability=Cap.WIFI_MAX_CLIENTS,
+            candidates=("{root}.MaxAssociatedDevices",),
+            leaf_map={"max_clients": ("MaxAssociatedDevices",)},
+        ),
+        Cap.WIFI_AUTH: PathFamily(
+            capability=Cap.WIFI_AUTH,
+            candidates=("{root}.BeaconType",),
+            leaf_map={"auth": ("BeaconType",)},
+            notes="BeaconType TR-098: None, Basic, WPA, 11i, WPAand11i.",
+        ),
+        Cap.WIFI_ENCRYPTION: PathFamily(
+            capability=Cap.WIFI_ENCRYPTION,
+            candidates=(
+                "{root}.IEEE11iEncryptionModes",
+                "{root}.WPAEncryptionModes",
+            ),
+            leaf_map={"encryption": ("IEEE11iEncryptionModes", "WPAEncryptionModes")},
+        ),
+        Cap.WIFI_TX_POWER: PathFamily(
+            capability=Cap.WIFI_TX_POWER,
+            candidates=("{root}.TransmitPower",),
+            leaf_map={"tx_power": ("TransmitPower",)},
+            notes="Potência percentual do TR-098. Alias de vendor só entra com fixture.",
+        ),
+        Cap.WIFI_ASSOCIATED: PathFamily(
+            capability=Cap.WIFI_ASSOCIATED,
+            candidates=("{root}.AssociatedDevice",),
+            leaf_map={
+                "mac": ("AssociatedDeviceMACAddress", "MACAddress"),
+                "signal": ("X_SignalStrength", "SignalStrength"),
+                "authenticated": ("AssociatedDeviceAuthenticationState",),
+            },
+            notes="Clientes associados ao rádio. Não substitui Hosts.Host.",
+        ),
         Cap.WAN_VLAN: PathFamily(
             capability=Cap.WAN_VLAN,
             candidates=(

@@ -7,8 +7,8 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { Panel, PanelTitle } from "@/components/ops/primitives";
-import type { OpticalTelemetry } from "@/lib/device-workbench";
+import { Btn, Panel, PanelTitle } from "@/components/ops/primitives";
+import { opticalHealthLabel, type OpticalTelemetry } from "@/lib/device-workbench";
 
 function numeric(value: number | null | undefined, unit = ""): string {
   if (value == null) return "—";
@@ -44,7 +44,16 @@ function Metric({
   );
 }
 
-export function OpticalTelemetryPanel({ optical }: { optical: OpticalTelemetry }) {
+export function OpticalTelemetryPanel({
+  optical,
+  onRefresh,
+  refreshing = false,
+}: {
+  optical: OpticalTelemetry;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
+  const healthLabel = opticalHealthLabel(optical.health);
   const errors = [
     ["FEC", optical.fecErrors],
     ["HEC", optical.hecErrors],
@@ -57,10 +66,18 @@ export function OpticalTelemetryPanel({ optical }: { optical: OpticalTelemetry }
         title="Enlace óptico"
         hint="Telemetria GPON/ONU reportada pelo equipamento"
         action={
-          <span className="rounded-[4px] bg-signal-soft px-2 py-1 text-[11px] font-semibold text-signal">
-            {optical.technology || "Óptica"}
-            {optical.status ? ` · ${optical.status}` : ""}
-          </span>
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <span className="rounded-[4px] bg-signal-soft px-2 py-1 text-[11px] font-semibold text-signal">
+              {optical.technology || "Óptica"}
+              {optical.status ? ` · ${optical.status}` : ""}
+              {healthLabel ? ` · ${healthLabel}` : ""}
+            </span>
+            {onRefresh ? (
+              <Btn size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
+                Atualizar óptica
+              </Btn>
+            ) : null}
+          </div>
         }
       />
       <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">

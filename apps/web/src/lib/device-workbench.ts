@@ -20,6 +20,14 @@ export type DiagnosticHistoryItem = {
   report: Report;
 };
 
+export type WifiRadioSupports = {
+  hidden?: boolean;
+  maxClients?: boolean;
+  auth?: boolean;
+  encryption?: boolean;
+  txPower?: boolean;
+};
+
 export type WifiRadio = {
   root: string;
   ssid: string;
@@ -28,6 +36,21 @@ export type WifiRadio = {
   bandwidth?: string;
   enabled?: boolean | null;
   index?: number;
+  hidden?: boolean | null;
+  maxClients?: number | null;
+  authMode?: string;
+  encryption?: string;
+  txPower?: number | null;
+  supports?: WifiRadioSupports;
+};
+
+export type WifiClient = {
+  index: number;
+  mac: string;
+  signalDbm?: number | null;
+  authenticated?: boolean | null;
+  ssid: string;
+  radioIndex?: number;
 };
 
 export type WanProfile = {
@@ -70,10 +93,13 @@ export type NeighborNetwork = {
   vendor?: string;
 };
 
+export type OpticalHealth = "good" | "warning" | "critical" | "no_signal" | "overload";
+
 export type OpticalTelemetry = {
   detected: true;
   technology: string;
   status: string;
+  health?: OpticalHealth | null;
   rxPowerDbm?: number | null;
   txPowerDbm?: number | null;
   distanceMeters?: number | null;
@@ -103,7 +129,35 @@ export type Workbench = {
   portmap: PortMapping[];
   neighbors: NeighborNetwork[];
   optical: OpticalTelemetry | null;
+  wifiClients?: WifiClient[];
 };
+
+export function opticalHealthLabel(health: string | null | undefined): string | null {
+  switch (health) {
+    case "good":
+      return "Sinal bom";
+    case "warning":
+      return "Sinal em atenção";
+    case "critical":
+      return "Sinal crítico";
+    case "no_signal":
+      return "Sem sinal";
+    case "overload":
+      return "Sinal sobrecarregado";
+    default:
+      return null;
+  }
+}
+
+export function opticalInventoryMessage(online: boolean, present: boolean): string | null {
+  if (present) return null;
+  return online ? "Nenhuma telemetria óptica neste inventário." : "Aguardando CPE online";
+}
+
+export function associatedClientsMessage(online: boolean, count: number): string | null {
+  if (count > 0) return null;
+  return online ? "Nenhum cliente associado a este rádio." : "Aguardando CPE online";
+}
 
 export function wifiBand(radio: WifiRadio): "24" | "5" {
   const channel = Number(radio.channel);

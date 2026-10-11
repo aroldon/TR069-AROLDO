@@ -53,6 +53,20 @@ GENERIC = VendorProfile(
             candidates=("{root}.Enable",),
             leaf_map={"enable": ("Enable",)},
         ),
+        Cap.WIFI_HIDDEN: PathFamily(
+            capability=Cap.WIFI_HIDDEN,
+            candidates=("{root}.SSIDAdvertisementEnabled",),
+            notes="False neste leaf significa SSID oculto. Só gravar se o leaf existir.",
+        ),
+        Cap.WIFI_MAX_CLIENTS: PathFamily(
+            capability=Cap.WIFI_MAX_CLIENTS,
+            candidates=("{root}.MaxAssociatedDevices",),
+        ),
+        Cap.WIFI_TX_POWER: PathFamily(
+            capability=Cap.WIFI_TX_POWER,
+            candidates=("{root}.TransmitPower",),
+            notes="Percentual TR-098 comum: 0, 20, 40, 60, 80, 100. Não inventar outro leaf.",
+        ),
         Cap.WAN_VLAN: PathFamily(
             capability=Cap.WAN_VLAN,
             candidates=(
@@ -76,6 +90,7 @@ GENERIC = VendorProfile(
             candidates=(
                 "Device.Optical.Interface",
                 "InternetGatewayDevice.WANDevice.1.OpticalInterface",
+                "InternetGatewayDevice.X_Realtek_EponInterfaceConfig.Stats",
             ),
             leaf_map={
                 "status": ("Status", "ConnectionStatus", "LinkStatus"),

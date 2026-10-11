@@ -15,7 +15,7 @@ from app.acs.actions import ActionContext, dispatch, ensure_handlers_loaded, get
 from app.acs.summary import DEVICE_DETAIL_PROJECTION, build_workbench, device_summary
 from app.core.database import get_db
 from app.core.deps import AuthContext, get_current_auth, optional_acs_server_id
-from app.cpe.extract import extract_wan_profiles
+from app.cpe.extract import classify_optical_rx, extract_wan_profiles
 from app.cpe.params import Cap
 from app.cpe.profiles import discovery_candidates
 from app.models.audit import AuditEvent
@@ -208,9 +208,19 @@ async def get_device(
         raise HTTPException(status_code=404, detail="Dispositivo não encontrado")
     settings = db.query(AppSettings).first()
     threshold = settings.online_threshold_s if settings else 300
+    workbench = build_workbench(dev)
+    optical = workbench.get("optical")
+    if isinstance(optical, dict):
+        optical["health"] = classify_optical_rx(
+            optical.get("rxPowerDbm"),
+            no_signal=settings.optical_rx_no_signal_dbm if settings else -30,
+            critical=settings.optical_rx_critical_dbm if settings else -27,
+            warning=settings.optical_rx_warning_dbm if settings else -24,
+            overload=settings.optical_rx_overload_dbm if settings else -8,
+        )
     return {
         "acs_server_id": str(server.id),
         "summary": device_summary(dev, online_threshold_s=server.online_threshold_s or threshold),
         "device": dev,
-        "workbench": build_workbench(dev),
+        "workbench": workbench,
     }

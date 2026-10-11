@@ -13,6 +13,7 @@ from app.cpe.extract import (
     extract_optical_telemetry,
     extract_port_mappings,
     extract_wan_profiles,
+    extract_wifi_clients,
     extract_wifi_radios,
 )
 from app.cpe.params import Cap, identity_from_device
@@ -108,4 +109,5 @@ def build_workbench(dev: dict[str, Any]) -> dict[str, Any]:
         "portmap": extract_port_mappings(dev),
         "neighbors": extract_neighbor_networks(dev),
         "optical": extract_optical_telemetry(dev),
+        "wifiClients": extract_wifi_clients(dev),
     }

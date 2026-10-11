@@ -49,6 +49,19 @@ def _ensure_columns() -> None:
             cols = {c["name"] for c in insp.get_columns("app_settings")}
             if "crypto_key_fp" not in cols:
                 conn.execute(text("ALTER TABLE app_settings ADD COLUMN crypto_key_fp VARCHAR(16)"))
+            optical_columns = {
+                "optical_rx_no_signal_dbm": -30,
+                "optical_rx_critical_dbm": -27,
+                "optical_rx_warning_dbm": -24,
+                "optical_rx_overload_dbm": -8,
+            }
+            for name, default in optical_columns.items():
+                if name not in cols:
+                    conn.execute(
+                        text(
+                            f"ALTER TABLE app_settings ADD COLUMN {name} FLOAT NOT NULL DEFAULT {default}"
+                        )
+                    )
         if "acs_servers" in insp.get_table_names() and dialect == "postgresql":
             # Bearer NBI opcional
             conn.execute(text("ALTER TABLE acs_servers ALTER COLUMN bearer_token_encrypted DROP NOT NULL"))

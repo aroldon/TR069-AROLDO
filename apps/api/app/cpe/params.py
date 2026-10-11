@@ -28,6 +28,9 @@ class Cap:
     WIFI_AUTO_CHANNEL = "wifi.auto_channel"
     WIFI_BANDWIDTH = "wifi.bandwidth"
     WIFI_ENABLE = "wifi.enable"
+    WIFI_HIDDEN = "wifi.hidden"  # SSIDAdvertisementEnabled (invertido na apresentação)
+    WIFI_MAX_CLIENTS = "wifi.max_clients"
+    WIFI_TX_POWER = "wifi.tx_power"
 
     WAN_DEVICE = "wan.device"  # container WANDevice
     WAN_VLAN = "wan.vlan"

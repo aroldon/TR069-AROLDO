@@ -1,10 +1,13 @@
 from app.cpe.extract import (
+    classify_optical_rx,
     extract_dhcp_lan,
     extract_lan_ports,
     extract_neighbor_networks,
     extract_optical_telemetry,
     extract_wan_profiles,
+    extract_wifi_clients,
     extract_wifi_radios,
+    optical_thresholds_error,
     wifi_set_parameter_values,
 )
 
@@ -395,3 +398,155 @@ def test_neighbors_zte_huawei_intelbras_via_registry():
     assert extract_neighbor_networks(zte)[0]["ssid"] == "Vizinho-ZTE"
     assert extract_neighbor_networks(hw)[0]["ssid"] == "Vizinho-HW"
     assert extract_neighbor_networks(itbs)[0]["ssid"] == "Vizinho-ITBS"
+
+
+def test_zte_wan_pon_voltage_is_millivolts_only_on_that_object():
+    dev = {
+        "_deviceId": {"_Manufacturer": "ZTE", "_ProductClass": "F670L"},
+        "InternetGatewayDevice": {
+            "WANDevice": {
+                "1": {
+                    "X_ZTE-COM_WANPONInterfaceConfig": {
+                        "RXPower": {"_value": "-25.08"},
+                        "TXPower": {"_value": "2.59"},
+                        "TransceiverTemperature": {"_value": "35.31"},
+                        "SupplyVoltage": {"_value": "3244"},
+                        "BiasCurrent": {"_value": "13.70"},
+                    }
+                }
+            }
+        },
+    }
+    optical = extract_optical_telemetry(dev)
+    assert optical["rxPowerDbm"] == -25.08
+    assert optical["txPowerDbm"] == 2.59
+    assert optical["voltageV"] == 3.244
+    assert optical["technology"] == "Óptica"
+
+
+def test_zte_ctcom_gpon_reads_camel_case_without_scaling_voltage():
+    dev = {
+        "_deviceId": {"_Manufacturer": "ZTE Corporation", "_ProductClass": "F660"},
+        "InternetGatewayDevice": {
+            "X_CT-COM_GponInterfaceConfig": {
+                "Stats": {
+                    "RxPower": {"_value": -22.5},
+                    "TxPower": {"_value": 2},
+                    "Voltage": {"_value": 3.3},
+                    "Temperature": {"_value": 41},
+                    "BiasCurrent": {"_value": 8},
+                }
+            }
+        },
+    }
+    optical = extract_optical_telemetry(dev)
+    assert optical["technology"] == "GPON"
+    assert optical["rxPowerDbm"] == -22.5
+    assert optical["voltageV"] == 3.3
+
+
+def test_huawei_gpon_wins_over_hw_debug_when_both_exist():
+    dev = {
+        "_deviceId": {"_Manufacturer": "Huawei", "_ProductClass": "EG8145V5"},
+        "InternetGatewayDevice": {
+            "X_HW_DEBUG": {"AdminTR069": {"RxPower": {"_value": -10}, "TxPower": {"_value": 1}}},
+            "WANDevice": {
+                "1": {
+                    "X_GponInterafceConfig": {
+                        "RXPower": {"_value": -23},
+                        "TXPower": {"_value": 2},
+                    }
+                }
+            },
+        },
+    }
+    assert extract_optical_telemetry(dev)["rxPowerDbm"] == -23
+
+
+def test_huawei_hw_debug_when_gpon_is_absent():
+    dev = {
+        "_deviceId": {"_Manufacturer": "Huawei Technologies Co., Ltd.", "_ProductClass": "HG8245H"},
+        "InternetGatewayDevice": {
+            "X_HW_DEBUG": {"AdminTR069": {"RxPower": {"_value": -21.5}, "TxPower": {"_value": 1.8}}}
+        },
+    }
+    optical = extract_optical_telemetry(dev)
+    assert optical["rxPowerDbm"] == -21.5
+    assert optical["txPowerDbm"] == 1.8
+
+
+def test_optical_health_thresholds_keep_overload_distinct():
+    assert classify_optical_rx(-31) == "no_signal"
+    assert classify_optical_rx(-28) == "critical"
+    assert classify_optical_rx(-25) == "warning"
+    assert classify_optical_rx(-18) == "good"
+    assert classify_optical_rx(-7) == "overload"
+    assert classify_optical_rx(None) is None
+    assert optical_thresholds_error(-30, -27, -24, -8) is None
+    assert optical_thresholds_error(-24, -27, -30, -8)
+
+
+def test_wifi_clients_are_separate_from_lan_hosts():
+    dev = {
+        "_deviceId": {"_Manufacturer": "Generic", "_ProductClass": "IGD"},
+        "InternetGatewayDevice": {
+            "LANDevice": {
+                "1": {
+                    "WLANConfiguration": {
+                        "1": {
+                            "SSID": {"_value": "Casa"},
+                            "Channel": {"_value": 6},
+                            "Enable": {"_value": True},
+                            "SSIDAdvertisementEnabled": {"_value": False},
+                            "BeaconType": {"_value": "11i"},
+                            "IEEE11iEncryptionModes": {"_value": "AESEncryption"},
+                            "MaxAssociatedDevices": {"_value": 16},
+                            "TransmitPower": {"_value": 80},
+                            "AssociatedDevice": {
+                                "1": {
+                                    "AssociatedDeviceMACAddress": {"_value": "aa:bb:cc:dd:ee:ff"},
+                                    "SignalStrength": {"_value": -48},
+                                    "AssociatedDeviceAuthenticationState": {"_value": True},
+                                }
+                            },
+                        }
+                    }
+                }
+            }
+        },
+    }
+    radio = extract_wifi_radios(dev)[0]
+    assert radio["hidden"] is True
+    assert radio["authMode"] == "WPA2"
+    assert radio["encryption"] == "AES"
+    assert radio["maxClients"] == 16
+    assert radio["transmitPower"] == 80
+    clients = extract_wifi_clients(dev)
+    assert clients[0]["mac"] == "aa:bb:cc:dd:ee:ff"
+    assert clients[0]["signalDbm"] == -48
+    assert clients[0]["ssid"] == "Casa"
+    values = wifi_set_parameter_values(
+        radio["root"],
+        hidden=False,
+        max_clients=32,
+        transmit_power=40,
+        dev=dev,
+    )
+    paths = {row[0]: row[1] for row in values}
+    assert paths[f"{radio['root']}.SSIDAdvertisementEnabled"] is True
+    assert paths[f"{radio['root']}.MaxAssociatedDevices"] == 32
+    assert paths[f"{radio['root']}.TransmitPower"] == 40
+
+
+def test_wifi_optional_writes_skip_missing_leaves():
+    dev = {
+        "_deviceId": {"_Manufacturer": "Generic", "_ProductClass": "IGD"},
+        "InternetGatewayDevice": {
+            "LANDevice": {"1": {"WLANConfiguration": {"1": {"SSID": {"_value": "Casa"}}}}}
+        },
+    }
+    radio = extract_wifi_radios(dev)[0]
+    values = wifi_set_parameter_values(
+        radio["root"], ssid="Nova", hidden=True, max_clients=8, transmit_power=100, dev=dev
+    )
+    assert values == [[f"{radio['root']}.SSID", "Nova", "xsd:string"]]

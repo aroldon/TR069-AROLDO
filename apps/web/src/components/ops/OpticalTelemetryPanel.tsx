@@ -7,7 +7,7 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
-import { Panel, PanelTitle } from "@/components/ops/primitives";
+import { Btn, Panel, PanelTitle } from "@/components/ops/primitives";
 import type { OpticalTelemetry } from "@/lib/device-workbench";
 
 function numeric(value: number | null | undefined, unit = ""): string {
@@ -44,7 +44,23 @@ function Metric({
   );
 }
 
-export function OpticalTelemetryPanel({ optical }: { optical: OpticalTelemetry }) {
+const HEALTH_LABEL: Record<string, string> = {
+  good: "Sinal adequado",
+  warning: "Sinal fraco",
+  critical: "Sinal crítico",
+  no_signal: "Sem sinal",
+  overload: "Sinal alto demais",
+};
+
+export function OpticalTelemetryPanel({
+  optical,
+  refreshing = false,
+  onRefresh,
+}: {
+  optical: OpticalTelemetry;
+  refreshing?: boolean;
+  onRefresh?: () => void;
+}) {
   const errors = [
     ["FEC", optical.fecErrors],
     ["HEC", optical.hecErrors],
@@ -57,9 +73,21 @@ export function OpticalTelemetryPanel({ optical }: { optical: OpticalTelemetry }
         title="Enlace óptico"
         hint="Telemetria GPON/ONU reportada pelo equipamento"
         action={
-          <span className="rounded-[4px] bg-signal-soft px-2 py-1 text-[11px] font-semibold text-signal">
-            {optical.technology || "Óptica"}
-            {optical.status ? ` · ${optical.status}` : ""}
+          <span className="flex items-center gap-2">
+            {optical.health ? (
+              <span className="rounded-[4px] bg-panel-2 px-2 py-1 text-[11px] font-semibold text-ink">
+                {HEALTH_LABEL[optical.health] || optical.health}
+              </span>
+            ) : null}
+            <span className="rounded-[4px] bg-signal-soft px-2 py-1 text-[11px] font-semibold text-signal">
+              {optical.technology || "Óptica"}
+              {optical.status ? ` · ${optical.status}` : ""}
+            </span>
+            {onRefresh ? (
+              <Btn size="sm" variant="outline" disabled={refreshing} onClick={onRefresh}>
+                {refreshing ? "Lendo…" : "Atualizar óptica"}
+              </Btn>
+            ) : null}
           </span>
         }
       />

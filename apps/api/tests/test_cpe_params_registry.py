@@ -48,6 +48,23 @@ def test_candidates_for_device_tree():
     assert "WiFi" in candidates_for(dev, Cap.WIFI_RADIO_CONTAINER)[0]
 
 
+def test_zte_optical_candidates_precede_generic_and_skip_huawei():
+    ident = DeviceIdentity(manufacturer="ZTE", product_class="F670L")
+    cands = resolve_candidates(ident, Cap.OPTICAL_CONTAINER, ALL_PROFILES)
+    assert cands[0].endswith("X_CT-COM_EponInterfaceConfig.Stats")
+    assert any("X_ZTE-COM_WANPONInterfaceConfig" in path for path in cands)
+    assert all("X_HW_DEBUG" not in path for path in cands)
+    assert any(path.endswith("Device.Optical.Interface") for path in cands)
+
+
+def test_huawei_keeps_gpon_before_hw_debug():
+    ident = DeviceIdentity(manufacturer="Huawei", product_class="EG8145V5")
+    cands = resolve_candidates(ident, Cap.OPTICAL_CONTAINER, ALL_PROFILES)
+    gpon = next(index for index, path in enumerate(cands) if "X_GponInterafceConfig" in path)
+    debug = next(index for index, path in enumerate(cands) if "X_HW_DEBUG" in path)
+    assert gpon < debug
+
+
 def test_fiberhome_profile_and_manufacturer_groups():
     ident = DeviceIdentity(
         manufacturer="FiberHome Telecommunication Technologies Co., Ltd.",

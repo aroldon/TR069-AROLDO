@@ -17,6 +17,7 @@ HUAWEI = VendorProfile(
                 "InternetGatewayDevice.WANDevice.1.X_GponInterafceConfig",
                 "InternetGatewayDevice.WANDevice.1.X_GponInterfaceConfig",
                 "Device.Optical.Interface",
+                "InternetGatewayDevice.X_HW_DEBUG.AdminTR069",
             ),
             leaf_map={
                 "status": ("Status", "ConnectionStatus"),

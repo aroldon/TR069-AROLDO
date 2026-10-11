@@ -51,13 +51,14 @@ Compatibilidade inicial:
 
 | Perfil | Containers |
 |---|---|
-| Huawei | `X_GponInterafceConfig` (typo presente em firmware) e `X_GponInterfaceConfig` |
-| Genérico | `Device.Optical.Interface.{i}` e `InternetGatewayDevice.WANDevice.1.OpticalInterface.{i}` |
+| Huawei | `X_GponInterafceConfig` (typo presente em firmware), `X_GponInterfaceConfig` e, por último, `X_HW_DEBUG.AdminTR069` |
+| ZTE | `X_CT-COM_EponInterfaceConfig.Stats`, `X_CT-COM_GponInterfaceConfig.Stats` e `WANDevice.1.X_ZTE-COM_WANPONInterfaceConfig` |
+| Genérico | `Device.Optical.Interface.{i}`, `InternetGatewayDevice.WANDevice.1.OpticalInterface.{i}` e `X_Realtek_EponInterfaceConfig.Stats` |
 
-Um stub GenieACS sem `_value` não detecta uma ONU nem vira texto na tela. O
-extrator também não tenta corrigir escalas proprietárias por heurística: se um
-vendor transmite potência, tensão ou distância em unidade codificada, a
-conversão deve entrar no perfil desse vendor acompanhada de fixture real.
+Um stub GenieACS sem `_value` não detecta uma ONU nem vira texto na tela. Não há
+heurística global de escala. A única conversão é `SupplyVoltage` acima de 100 no
+objeto `X_ZTE-COM_WANPONInterfaceConfig`, lido como milivolt. A saúde do RX usa
+limiares de `AppSettings`.
 
 FEC, HEC e CRC são contadores acumulados. Um total isolado é inventário; somente
 o delta positivo entre amostras pode representar erro atual e afetar diagnóstico.

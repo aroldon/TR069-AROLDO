@@ -9,6 +9,7 @@ from app.acs.actions import (  # noqa: F401 — side-effect: @action register
     dhcp,
     diagnostic,
     inventory,
+    optical,
     portmap,
     power,
     tags,

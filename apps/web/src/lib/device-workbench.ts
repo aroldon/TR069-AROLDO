@@ -27,7 +27,21 @@ export type WifiRadio = {
   autoChannel?: boolean | null;
   bandwidth?: string;
   enabled?: boolean | null;
+  hidden?: boolean | null;
+  maxClients?: number | null;
+  authMode?: string;
+  encryption?: string;
+  transmitPower?: number | null;
   index?: number;
+};
+
+export type WifiClient = {
+  index: number;
+  ssid: string;
+  band: "24" | "5";
+  mac: string;
+  signalDbm?: number | null;
+  authenticated?: boolean | null;
 };
 
 export type WanProfile = {
@@ -83,6 +97,7 @@ export type OpticalTelemetry = {
   fecErrors?: number | null;
   hecErrors?: number | null;
   crcErrors?: number | null;
+  health?: "good" | "warning" | "critical" | "no_signal" | "overload" | null;
 };
 
 export type LanPort = {
@@ -103,6 +118,7 @@ export type Workbench = {
   portmap: PortMapping[];
   neighbors: NeighborNetwork[];
   optical: OpticalTelemetry | null;
+  wifiClients?: WifiClient[];
 };
 
 export function wifiBand(radio: WifiRadio): "24" | "5" {

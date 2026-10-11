@@ -26,7 +26,9 @@ No GenieACS/ACL de rede, libere **somente** o IP da VPS Mr9. Técnicos no browse
 
 | Família | Path / trigger | Perfil |
 |---|---|---|
-| Genérico IGD | `LANHostConfigManagement`, `WLANConfiguration`, `IPPingDiagnostics` | `generic.igd` |
+| Genérico IGD | `LANHostConfigManagement`, `WLANConfiguration`, `IPPingDiagnostics`, `X_Realtek_EponInterfaceConfig.Stats` | `generic.igd` |
+| ZTE | `X_CT-COM_*InterfaceConfig.Stats`, `X_ZTE-COM_WANPONInterfaceConfig` | `zte` |
+| Huawei | `X_Gpon*InterfaceConfig`, depois `X_HW_DEBUG.AdminTR069` | `huawei` |
 | ZTE H3601P P9/P10 | `LANDevice.1.WiFi.Radio.*.NeighboringWiFiDiagnostic` | `zte.h3601p` |
 | ZTE H3601P P1/P3 | `LANDevice.1.WIFI.Radio.*` (case) | `zte` / fallback H3601 |
 | Huawei EG8145 / K562e | `…WiFi.NeighboringWiFiDiagnostic` | `huawei.eg8145` |

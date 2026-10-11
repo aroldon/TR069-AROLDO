@@ -11,6 +11,8 @@ def test_actions_registry_loads_core_handlers():
         "tags_remove",
         "wifi_get",
         "wifi_set",
+        "wifi_clients_get",
+        "optical_refresh",
         "wan_get",
         "wan_set_pppoe",
         "dhcp_get",

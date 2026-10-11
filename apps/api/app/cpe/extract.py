@@ -82,6 +82,7 @@ def extract_wifi_radios(dev: dict[str, Any]) -> list[dict[str, Any]]:
             enable_node = _node_field(node, enable_keys)
             enabled = leaf(enable_node) if enable_node is not None else None
             auto_channel_node = _node_field(node, auto_channel_keys)
+            advertised = _optional_bool(leaf(node.get("SSIDAdvertisementEnabled")))
             out.append(
                 {
                     "root": root,
@@ -91,12 +92,97 @@ def extract_wifi_radios(dev: dict[str, Any]) -> list[dict[str, Any]]:
                     "autoChannel": _optional_bool(leaf(auto_channel_node)),
                     "bandwidth": str_value(_node_field(node, bandwidth_keys)),
                     "enabled": _optional_bool(enabled),
+                    "hidden": None if advertised is None else not advertised,
+                    "maxClients": _scalar_number(node.get("MaxAssociatedDevices")),
+                    "authMode": _wifi_auth_label(str_value(node.get("BeaconType"))),
+                    "encryption": _wifi_encryption_label(
+                        str_value(node.get("WPAEncryptionModes"))
+                        or str_value(node.get("IEEE11iEncryptionModes"))
+                    ),
+                    "transmitPower": _scalar_number(node.get("TransmitPower")),
                     "container": container_path,
                 }
             )
         if out:
             break
     return out
+
+
+def _wifi_auth_label(raw: str) -> str:
+    key = raw.strip().lower()
+    if not key:
+        return ""
+    return {
+        "none": "Aberta",
+        "basic": "Aberta",
+        "wpa": "WPA",
+        "11i": "WPA2",
+        "wpa2": "WPA2",
+        "wpaand11i": "WPA/WPA2",
+        "wpawpa2": "WPA/WPA2",
+    }.get(key, raw.strip())
+
+
+def _wifi_encryption_label(raw: str) -> str:
+    key = raw.strip().upper().replace(" ", "")
+    if not key:
+        return ""
+    return {
+        "AESENCRYPTION": "AES",
+        "AES": "AES",
+        "TKIPENCRYPTION": "TKIP",
+        "TKIP": "TKIP",
+        "TKIPANDAESENCRYPTION": "TKIP+AES",
+        "TKIPAES": "TKIP+AES",
+        "TKIP+AES": "TKIP+AES",
+    }.get(key, raw.strip())
+
+
+def extract_wifi_clients(dev: dict[str, Any]) -> list[dict[str, Any]]:
+    """Clientes associados ao rádio. Não substitui Hosts.Host (LAN/DHCP)."""
+    clients: list[dict[str, Any]] = []
+    for radio in extract_wifi_radios(dev):
+        root = str(radio.get("root") or "")
+        block = param_at(dev, f"{root}.AssociatedDevice")
+        if not isinstance(block, dict):
+            continue
+        for idx, node in iter_numeric_children(block):
+            if not isinstance(node, dict):
+                continue
+            mac = str_value(node.get("AssociatedDeviceMACAddress")) or str_value(
+                node.get("MACAddress")
+            )
+            signal = _scalar_number(node.get("X_SignalStrength"))
+            if signal is None:
+                signal = _scalar_number(node.get("SignalStrength"))
+            if not mac and signal is None:
+                continue
+            clients.append(
+                {
+                    "index": int(idx),
+                    "ssid": radio.get("ssid") or "",
+                    "band": "24" if _radio_is_24(radio) else "5",
+                    "mac": mac,
+                    "signalDbm": signal,
+                    "authenticated": _optional_bool(
+                        leaf(node.get("AssociatedDeviceAuthenticationState"))
+                    ),
+                }
+            )
+    return clients
+
+
+def _radio_is_24(radio: dict[str, Any]) -> bool:
+    try:
+        channel = int(str(radio.get("channel") or "0"))
+    except ValueError:
+        channel = 0
+    if channel > 0:
+        return channel <= 14
+    try:
+        return int(radio.get("index") or 1) <= 1
+    except (TypeError, ValueError):
+        return True
 
 
 def extract_wan_profiles(dev: dict[str, Any]) -> list[dict[str, Any]]:
@@ -167,8 +253,8 @@ def extract_wan_profiles(dev: dict[str, Any]) -> list[dict[str, Any]]:
     return profiles
 
 
-def _optical_number(node: Any) -> float | int | None:
-    """Converte telemetria numérica sem adivinhar escalas proprietárias."""
+def _scalar_number(node: Any) -> float | int | None:
+    """Número escalar de um leaf GenieACS, sem converter unidade proprietária."""
     value = leaf(node)
     if value is None or isinstance(value, bool):
         return None
@@ -182,6 +268,65 @@ def _optical_number(node: Any) -> float | int | None:
     except ValueError:
         return None
     return int(parsed) if parsed.is_integer() else parsed
+
+
+def _optical_number(node: Any) -> float | int | None:
+    return _scalar_number(node)
+
+
+# SupplyVoltage neste objeto, acima de 100, foi observado em mV (F670L).
+_ZTE_WAN_PON_MARKER = "X_ZTE-COM_WANPONInterfaceConfig"
+
+
+def _optical_voltage(root: str, node: Any) -> float | int | None:
+    value = _optical_number(node)
+    if value is None:
+        return None
+    if _ZTE_WAN_PON_MARKER in root and abs(float(value)) > 100:
+        scaled = float(value) / 1000.0
+        return int(scaled) if scaled.is_integer() else round(scaled, 3)
+    return value
+
+
+def classify_optical_rx(
+    rx: float | None,
+    *,
+    no_signal: float = -30.0,
+    critical: float = -27.0,
+    warning: float = -24.0,
+    overload: float = -8.0,
+) -> str | None:
+    """Classifica RX em dBm. Limiares vêm de AppSettings.
+
+    `overload` fica distinto de `warning`: sinal alto demais não é o mesmo
+    problema que sinal fraco.
+    """
+    if rx is None:
+        return None
+    value = float(rx)
+    if value <= float(no_signal):
+        return "no_signal"
+    if value <= float(critical):
+        return "critical"
+    if value <= float(warning):
+        return "warning"
+    if value >= float(overload):
+        return "overload"
+    return "good"
+
+
+def optical_thresholds_error(
+    no_signal: float,
+    critical: float,
+    warning: float,
+    overload: float,
+) -> str | None:
+    values = (no_signal, critical, warning, overload)
+    if any(value < -60 or value > 10 for value in values):
+        return "Limiares ópticos devem ficar entre -60 e 10 dBm"
+    if not (no_signal < critical < warning < overload):
+        return "A ordem dos limiares deve ser sem sinal < crítico < atenção < sobrecarga"
+    return None
 
 
 def _optical_field(dev: dict[str, Any], root: str, aliases: list[str]) -> Any:
@@ -225,7 +370,13 @@ def extract_optical_telemetry(dev: dict[str, Any]) -> dict[str, Any] | None:
             continue
         technology = str_value(raw["technology"])
         if not technology:
-            technology = "GPON" if "gpon" in root.lower() else "Óptica"
+            lowered = root.lower()
+            if "gpon" in lowered:
+                technology = "GPON"
+            elif "epon" in lowered:
+                technology = "EPON"
+            else:
+                technology = "Óptica"
         return {
             "detected": True,
             "technology": technology,
@@ -234,7 +385,7 @@ def extract_optical_telemetry(dev: dict[str, Any]) -> dict[str, Any] | None:
             "txPowerDbm": _optical_number(raw["tx_power"]),
             "distanceMeters": _optical_number(raw["distance"]),
             "temperatureC": _optical_number(raw["temperature"]),
-            "voltageV": _optical_number(raw["voltage"]),
+            "voltageV": _optical_voltage(root, raw["voltage"]),
             "biasCurrentMa": _optical_number(raw["bias"]),
             "fecErrors": _optical_number(raw["fec"]),
             "hecErrors": _optical_number(raw["hec"]),
@@ -495,6 +646,9 @@ def diag_roots(dev: dict[str, Any]) -> dict[str, str | None]:
     }
 
 
+_TX_POWER_STEPS = {0, 20, 40, 60, 80, 100}
+
+
 def wifi_set_parameter_values(
     root: str,
     *,
@@ -503,6 +657,9 @@ def wifi_set_parameter_values(
     channel: int | None = None,
     bandwidth: str | None = None,
     enabled: bool | None = None,
+    hidden: bool | None = None,
+    max_clients: int | None = None,
+    transmit_power: int | None = None,
     dev: dict[str, Any] | None = None,
 ) -> list[list[Any]]:
     """Monta SPV usando Cap.WIFI_SSID / Cap.WIFI_KEY do catálogo."""
@@ -555,4 +712,28 @@ def wifi_set_parameter_values(
         ]
         path = first_existing_path(sample, paths, require_value=False) or paths[0]
         pvs.append([path, bool(enabled), "xsd:boolean"])
+    if hidden is not None:
+        paths = [
+            tmpl.replace("{root}", root)
+            for tmpl in (candidates_for(sample, Cap.WIFI_HIDDEN) or ["{root}.SSIDAdvertisementEnabled"])
+        ]
+        path = first_existing_path(sample, paths, require_value=False)
+        if path:
+            pvs.append([path, not bool(hidden), "xsd:boolean"])
+    if max_clients is not None:
+        paths = [
+            tmpl.replace("{root}", root)
+            for tmpl in (candidates_for(sample, Cap.WIFI_MAX_CLIENTS) or ["{root}.MaxAssociatedDevices"])
+        ]
+        path = first_existing_path(sample, paths, require_value=False)
+        if path:
+            pvs.append([path, int(max_clients), "xsd:unsignedInt"])
+    if transmit_power is not None:
+        paths = [
+            tmpl.replace("{root}", root)
+            for tmpl in (candidates_for(sample, Cap.WIFI_TX_POWER) or ["{root}.TransmitPower"])
+        ]
+        path = first_existing_path(sample, paths, require_value=False)
+        if path:
+            pvs.append([path, int(transmit_power), "xsd:unsignedInt"])
     return pvs

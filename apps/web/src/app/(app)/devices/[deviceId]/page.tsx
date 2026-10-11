@@ -51,6 +51,7 @@ import {
   type PortMapping,
   type Report,
   type WanProfile,
+  type WifiClient,
   type WifiRadio,
   type Workbench,
 } from "@/lib/device-workbench";
@@ -98,6 +99,12 @@ export default function DeviceDetailPage() {
     channel: "",
     bandwidth: "",
     enabled: true,
+    hidden: false,
+    maxClients: "",
+    transmitPower: "",
+    supportsHidden: false,
+    supportsMaxClients: false,
+    supportsTransmitPower: false,
   });
   const [lanEdit, setLanEdit] = useState(false);
   const [lanDialogPosition, setLanDialogPosition] = useState<FloatingDialogPosition>({
@@ -210,9 +217,13 @@ export default function DeviceDetailPage() {
       setMsg(
         isInteractiveDiagnostic
           ? "Diagnóstico iniciado em uma sessão imediata com o CPE."
-          : res.queued
-            ? "Alteração enfileirada. O CPE aplicará no próximo contato com o ACS."
-            : "Alteração confirmada pelo ACS.",
+          : name === "optical_refresh"
+            ? res.queued
+              ? "Leitura óptica enfileirada. O valor atualiza no próximo contato do CPE."
+              : "Leitura óptica solicitada ao CPE."
+            : res.queued
+              ? "Alteração enfileirada. O CPE aplicará no próximo contato com o ACS."
+              : "Alteração confirmada pelo ACS.",
       );
       if (res.report) setReport(res.report);
       await refresh(name === "diagnostic_full" ? null : undefined);
@@ -231,6 +242,12 @@ export default function DeviceDetailPage() {
       channel: radio.autoChannel ? "0" : radio.channel || "",
       bandwidth: radio.bandwidth || "",
       enabled: radio.enabled !== false,
+      hidden: radio.hidden === true,
+      maxClients: radio.maxClients != null ? String(radio.maxClients) : "",
+      transmitPower: radio.transmitPower != null ? String(radio.transmitPower) : "",
+      supportsHidden: radio.hidden != null,
+      supportsMaxClients: radio.maxClients != null,
+      supportsTransmitPower: radio.transmitPower != null,
     });
     setWifiDialogPosition(positionFloatingDialog(anchor, 680, 680));
     setWifiEdit(radio);
@@ -629,7 +646,13 @@ export default function DeviceDetailPage() {
                   />
                 </div>
               </Panel>
-              {wb?.optical ? <OpticalTelemetryPanel optical={wb.optical} /> : null}
+              {wb?.optical ? (
+                <OpticalTelemetryPanel
+                  optical={wb.optical}
+                  refreshing={busy}
+                  onRefresh={() => runAction("optical_refresh")}
+                />
+              ) : null}
               <LiveTrafficChart deviceId={deviceId} online={online} />
             </>
           ) : null}
@@ -705,6 +728,7 @@ export default function DeviceDetailPage() {
                   </p>
                 </Panel>
               ) : null}
+              <WifiClientsPanel clients={wb?.wifiClients || []} />
             </div>
           ) : null}
 
@@ -1411,6 +1435,63 @@ export default function DeviceDetailPage() {
                     className="h-4 w-4 accent-accent"
                   />
                 </label>
+                {wifiDraft.supportsHidden ? (
+                  <label className="flex items-center justify-between rounded-[6px] border border-rule bg-panel-2 px-3 py-2.5 text-[13px] font-semibold">
+                    <span>
+                      <span className="block">Ocultar SSID</span>
+                      <span className="text-[12px] font-normal text-quiet">
+                        Só aparece quando o CPE informa o anúncio do nome da rede.
+                      </span>
+                    </span>
+                    <input
+                      type="checkbox"
+                      checked={wifiDraft.hidden}
+                      onChange={(event) =>
+                        setWifiDraft({ ...wifiDraft, hidden: event.target.checked })
+                      }
+                      className="h-4 w-4 accent-accent"
+                    />
+                  </label>
+                ) : null}
+                {wifiDraft.supportsMaxClients ? (
+                  <div>
+                    <FieldLabel>Máximo de clientes</FieldLabel>
+                    <Control
+                      type="number"
+                      min={1}
+                      max={128}
+                      value={wifiDraft.maxClients}
+                      onChange={(event) =>
+                        setWifiDraft({ ...wifiDraft, maxClients: event.target.value })
+                      }
+                    />
+                  </div>
+                ) : null}
+                {wifiDraft.supportsTransmitPower ? (
+                  <div>
+                    <FieldLabel>Potência de transmissão</FieldLabel>
+                    <SelectControl
+                      value={wifiDraft.transmitPower}
+                      onChange={(event) =>
+                        setWifiDraft({ ...wifiDraft, transmitPower: event.target.value })
+                      }
+                    >
+                      <option value="">Manter atual</option>
+                      {[0, 20, 40, 60, 80, 100].map((power) => (
+                        <option key={power} value={power}>
+                          {power}%
+                        </option>
+                      ))}
+                    </SelectControl>
+                  </div>
+                ) : null}
+                {wifiEdit.authMode || wifiEdit.encryption ? (
+                  <p className="text-[12px] text-quiet">
+                    Autenticação {wifiEdit.authMode || "não informada"}
+                    {wifiEdit.encryption ? ` · cifra ${wifiEdit.encryption}` : ""}. Estes
+                    campos são só leitura para não derrubar a rede com um modo incompatível.
+                  </p>
+                ) : null}
               </section>
             </div>
             <div className="flex shrink-0 justify-end gap-2 border-t border-rule bg-panel-2 px-5 py-3.5">
@@ -1420,7 +1501,22 @@ export default function DeviceDetailPage() {
               <Btn
                 disabled={busy || !wifiDraft.root}
                 onClick={async () => {
-                  await runAction("wifi_set", wifiDraft);
+                  const params: Record<string, unknown> = {
+                    root: wifiDraft.root,
+                    ssid: wifiDraft.ssid,
+                    channel: wifiDraft.channel,
+                    bandwidth: wifiDraft.bandwidth,
+                    enabled: wifiDraft.enabled,
+                  };
+                  if (wifiDraft.password) params.password = wifiDraft.password;
+                  if (wifiDraft.supportsHidden) params.hidden = wifiDraft.hidden;
+                  if (wifiDraft.supportsMaxClients && wifiDraft.maxClients) {
+                    params.maxClients = Number(wifiDraft.maxClients);
+                  }
+                  if (wifiDraft.supportsTransmitPower && wifiDraft.transmitPower !== "") {
+                    params.transmitPower = Number(wifiDraft.transmitPower);
+                  }
+                  await runAction("wifi_set", params);
                   setWifiEdit(null);
                 }}
               >
@@ -1733,6 +1829,57 @@ function OperationalMetric({
   );
 }
 
+function WifiClientsPanel({ clients }: { clients: WifiClient[] }) {
+  return (
+    <Panel flush className="md:col-span-2 xl:col-span-3 overflow-hidden">
+      <div className="border-b border-rule bg-panel-2 px-3.5 py-2.5">
+        <h2 className="text-[14px] font-bold text-ink">Clientes no Wi-Fi</h2>
+        <p className="text-[12px] text-quiet">
+          Associação de rádio. A lista de hosts LAN continua na aba Hosts.
+        </p>
+      </div>
+      {clients.length ? (
+        <div className="overflow-x-auto">
+          <table className="ops-table">
+            <thead>
+              <tr>
+                <th>SSID</th>
+                <th>Faixa</th>
+                <th>MAC</th>
+                <th>Sinal</th>
+                <th>Autenticado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {clients.map((client) => (
+                <tr key={`${client.ssid}-${client.mac}-${client.index}`}>
+                  <td>{client.ssid || "—"}</td>
+                  <td>{client.band === "24" ? "2.4 GHz" : "5 GHz"}</td>
+                  <td className="tech">{client.mac || "—"}</td>
+                  <td className="tech">
+                    {client.signalDbm != null ? `${client.signalDbm} dBm` : "—"}
+                  </td>
+                  <td>
+                    {client.authenticated == null
+                      ? "—"
+                      : client.authenticated
+                        ? "Sim"
+                        : "Não"}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="px-3.5 py-3 text-[13px] text-quiet">
+          Nenhum cliente associado foi reportado neste inventário.
+        </p>
+      )}
+    </Panel>
+  );
+}
+
 function WifiCard({
   label,
   radio,
@@ -1785,6 +1932,11 @@ function WifiCard({
         <Item k="SSID" v={radio.ssid || "—"} />
         <Item k="Canal" v={radio.channel || "—"} tech />
         <Item k="Largura" v={radio.bandwidth || "—"} tech />
+        {radio.authMode ? <Item k="Autenticação" v={radio.authMode} /> : null}
+        {radio.encryption ? <Item k="Cifra" v={radio.encryption} /> : null}
+        {radio.hidden != null ? (
+          <Item k="SSID oculto" v={radio.hidden ? "Sim" : "Não"} />
+        ) : null}
       </dl>
     </Panel>
   );
